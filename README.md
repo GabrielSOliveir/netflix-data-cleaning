@@ -1,7 +1,8 @@
 # Viewing data cleaning
 
 A small training project: clean viewing events using a title catalog, then split them per member.
-Python 3.9+. Cleaning and the top 10 need no packages; the model needs `pip install -r requirements.txt`. The raw files are not in this repository: put them in `data/`.
+Python 3.9+. Cleaning and the top 10 need no packages; the model needs Python 3.10+ and
+`pip install -r requirements.txt`. The raw files are not in this repository: put them in `data/`.
 
 ## Run
 
@@ -56,7 +57,8 @@ TT-0412, TT-0347 and TT-0588 have enough views for the list but are not in the c
 **Finding:** the model beats the popular top 10, but a simple favourite-genre rule beats the model.
 
 Member tower: genres and other catalog features of the titles watched, plus country, profile and device.
-Title tower: catalog features plus a small vector per title. Only unwatched catalog titles are recommended.
+Title tower: catalog features plus a small vector per title. Both give 64 numbers. The score is their dot product
+plus one popularity bias per title. The brief is in [PROMPT.md](PROMPT.md). Only unwatched catalog titles are recommended.
 
 ```sh
 python3 train_two_tower.py tune --train data/clean/train.csv \
@@ -65,18 +67,22 @@ python3 train_two_tower.py final --train data/clean/train.csv --holdout data/cle
   --catalog "data/Netflix title catalog, November 2026.csv" --popular data/baseline/popular_top10.csv
 ```
 
-`tune` uses a validation set cut from train. `final` reads the holdout once and refuses to run again while
-`models/results.json` exists. Holdout result, 585 members:
+`tune` uses a validation set cut from train and logs one run per setting to W&B (project `netflix-zero`). It needs
+`WANDB_API_KEY` in `.env`. `final` reads the holdout and refuses to run again while `results.json` exists in its
+output folder. `models/` is not in git. Holdout result, 585 members:
 
 | List | hit@10 | NDCG@10 | Hits |
 |---|---|---|---|
 | Popular top 10 | 0.164 | 0.097 | 96 |
 | Popular, unwatched | 0.174 | 0.105 | 102 |
-| **Two-tower (seed 0)** | **0.581** | **0.296** | **340** |
+| Two-tower, 16 dimensions (seed 0) | 0.581 | 0.296 | 340 |
+| **Two-tower, 64 dimensions (seed 0)** | **0.603** | **0.310** | **353** |
 | Popular in favourite genre, unwatched (no learning) | 0.641 | 0.337 | 375 |
 
-Seeds 0 to 4 of the model give 0.568 to 0.600. It beats both popular lists (McNemar p < 0.001) and **loses to the
-genre rule** (p < 0.001): almost all of its gain is the member's favourite genre.
+The 64-dimension model beats both popular lists (McNemar p < 0.001) and **loses to the genre rule** (p = 0.017):
+almost all of its gain is the member's favourite genre. Over seeds 0 to 4 it gives 0.573 to 0.603 (mean 0.587) and
+the 16-dimension model 0.568 to 0.600 (mean 0.585), so 64 is not clearly better than 16. The 64-dimension score is a
+second look at the holdout: 64 comes from the brief, and its other settings were chosen on validation.
 
 ## Known limits
 

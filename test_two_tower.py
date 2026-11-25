@@ -1,6 +1,12 @@
+import contextlib
 import inspect
+import io
+import os
+import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 
@@ -103,13 +109,57 @@ class Recommendations(unittest.TestCase):
 
 ROOT = Path(__file__).parent
 CATALOG_FILE = ROOT / "data" / "Netflix title catalog, November 2026.csv"
+MODEL_FILE = ROOT / "models" / "model_64" / "two_tower.npz"
 
 
-@unittest.skipUnless(CATALOG_FILE.exists(), "the raw files are not in data/")
+@unittest.skipUnless(CATALOG_FILE.exists() and MODEL_FILE.exists(), "the raw files or the model are not here")
 class SavedModel(unittest.TestCase):
+    def setUp(self):
+        self.model = np.load(MODEL_FILE)
+
     def test_titles_are_the_catalog(self):
-        saved = np.load(ROOT / "models" / "two_tower.npz")["title_ids"].tolist()
-        self.assertEqual(saved, sorted(r["title_id"] for r in read_csv(CATALOG_FILE)))
+        self.assertEqual(self.model["title_ids"].tolist(), sorted(r["title_id"] for r in read_csv(CATALOG_FILE)))
+
+    def test_both_towers_output_64_dimensions(self):
+        self.assertEqual([self.model[k].shape[1] for k in ("mw2", "tw2", "own")], [64, 64, 64])
+
+
+class Tracking(unittest.TestCase):
+    """A fake wandb: no test reaches the network or the key file."""
+
+    def login(self, environ):
+        fake, out = mock.Mock(), io.StringIO()
+        modules = {"wandb": fake, "dotenv": SimpleNamespace(load_dotenv=lambda path: None)}
+        with mock.patch.dict(sys.modules, modules), mock.patch.dict(os.environ, environ, clear=True), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            train_two_tower.wandb_login()
+        return fake, out.getvalue()
+
+    def test_missing_key_stops(self):
+        with self.assertRaises(SystemExit) as error:
+            self.login({})
+        self.assertEqual(str(error.exception), "WANDB_API_KEY is missing")
+
+    def test_key_is_not_printed_or_passed_to_login(self):
+        fake, printed = self.login({"WANDB_API_KEY": "not-a-real-key"})
+        self.assertEqual(printed, "")
+        fake.login.assert_called_once_with(verify=True)
+
+    def test_one_run_per_setting_with_the_means(self):
+        fake = mock.Mock()
+        train_two_tower.log_setting(fake, {"dim": 64}, {5: (0.3, 0.6), 10: (0.4, 0.7)})
+        self.assertEqual(fake.init.call_args[1]["project"], "netflix-zero")
+        self.assertEqual(fake.init.call_args[1]["config"], {"dim": 64, "seeds": 5})
+        self.assertEqual([c[0][0] for c in fake.log.call_args_list],
+                         [{"epoch": 5, "val hit@10": 0.6, "val NDCG@10": 0.3},
+                          {"epoch": 10, "val hit@10": 0.7, "val NDCG@10": 0.4}])
+        fake.finish.assert_called_once_with()
+
+    def test_dimension_is_fixed_at_64(self):
+        self.assertEqual(train_two_tower.GRID["dim"], [64])
+
+    def test_final_does_not_use_wandb(self):
+        self.assertNotIn("wandb", inspect.getsource(train_two_tower.final))
 
 
 class Evaluate(unittest.TestCase):

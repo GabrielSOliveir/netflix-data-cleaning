@@ -23,7 +23,9 @@
    and the model. It keeps TT-0412, TT-0347 and TT-0588 out of the top 10. A title missing from the catalog has no name to show, and one shared rule keeps the
    comparison between baseline and model fair.
 10. **No code or check copies the project folder or touches `.env`.** Checks that need a copy copy named files
-    only. `test_no_secret_copies.py` enforces this for the Python files in the repository.
+    only. `test_no_secret_copies.py` enforces this for the Python files in the repository. One exception, one exact
+    line: `train_two_tower.py` loads `.env` for the W&B key. The key is not passed to `wandb.login`, which would
+    save it in `~/.netrc`.
 11. **The two-tower model uses numpy** (pinned in `requirements.txt`); cleaning, split and top 10 stay on the
     standard library. Alternative: PyTorch, too heavy for 300 titles and about 3,000 rows.
 12. **How the model is compared** (written before any training).
@@ -40,3 +42,15 @@
 13. **Result of the single holdout run:** the two-tower model beats the popular top 10 (340 hits against 96 of 585)
     and loses to the genre rule (375). The holdout is now used: a new model is chosen on validation, and a
     second holdout score must be reported as a second look.
+14. **Retrain with 64 dimensions, and a second holdout run** (written before the run). The project brief requires
+    64-dimension vectors; 64 does not come from the holdout, so this run is allowed. The holdout had been used
+    once, by the 16-dimension model, so this is reported as a second look. Dimension is fixed at 64; hidden size,
+    learning rate, decay and epochs are chosen on validation only. Hidden size 64 joins the grid, because 16 or 32
+    would limit a 64-dimension vector. The 64-dimension model is the result whether it is better or worse.
+15. **Tuning is logged to W&B** (project `netflix-zero`): one run per setting, with the setting and the mean
+    validation metrics, plus the list of installed packages that W&B adds. No code, git data or rows are sent.
+16. **`models/` is not in git.** The 16-dimension files are kept in `models/model_16/` and in commit `b50ce8e`.
+17. **Result of the second holdout run (64 dimensions):** 353 hits of 585 with seed 0, against 340 for 16
+    dimensions, 96 for the popular top 10 and 375 for the genre rule. Over five seeds 64 and 16 are level
+    (mean 343.6 and 342.4 hits). Seed 0 is the model because it was fixed in decision 12; here it is also the
+    best of the five seeds.
