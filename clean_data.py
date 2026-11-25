@@ -1,4 +1,4 @@
-"""Clean viewing events with a title catalog, then split them by date.
+"""Clean viewing events with a title catalog, then split them per member.
 
 Rules, applied to each event:
   1. Watch time above the title's runtime: remove the record.
@@ -6,13 +6,16 @@ Rules, applied to each event:
   3. Completed is True only when the watch time equals the catalog runtime.
      With no known runtime the match cannot be proved, so completed is False.
 
-Split: train is every date up to and including --train-end; holdout is every later date.
+Split, for each member, with watches sorted by date and time, then title id, then file order:
+  holdout is the last watch of a catalog title the member had not watched before;
+  train is every watch before it. Every watch after it is removed.
+  A member without one holdout title and one watch before it stays whole in train.
 """
 import argparse
 import csv
 import math
 from collections import Counter
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 AUDIT_COLUMNS = ["completed_raw", "completed_check"]
@@ -68,12 +71,35 @@ def clean_event(row, runtime, watch_col, completed_col):
                         completed_col: completed}), f"kept: {check}"
 
 
-def split_by_date(rows, date_col, train_end):
-    train, holdout = [], []
-    for row in rows:
-        day = date.fromisoformat(row[date_col][:10])
-        (train if day <= train_end else holdout).append(row)
-    return train, holdout
+def split_by_member(rows, catalog, member_col, id_col, date_col):
+    """Return (train, holdout, removed repeats, removed later watches, left out members by reason)."""
+    by_member = {}
+    for i, row in enumerate(rows):
+        if not row[member_col].strip():
+            raise ValueError(f"row with no member: {i}")
+        by_member.setdefault(row[member_col], []).append(i)
+
+    holdout, repeats, later, left_out = set(), set(), set(), Counter()
+    for watches in by_member.values():
+        watches.sort(key=lambda i: (datetime.fromisoformat(rows[i][date_col]), rows[i][id_col]))
+        seen, pick = set(), None
+        for i in watches:
+            title = rows[i][id_col]
+            if title in catalog and title not in seen:
+                pick = i
+            seen.add(title)
+        if pick is None:
+            left_out["no catalog title"] += 1
+            continue
+        if pick == watches[0]:
+            left_out["no watch before the holdout title"] += 1
+            continue
+        holdout.add(pick)
+        for i in watches[watches.index(pick) + 1:]:
+            (repeats if rows[i][id_col] == rows[pick][id_col] else later).add(i)
+
+    train = set(range(len(rows))) - holdout - repeats - later
+    return tuple([rows[i] for i in sorted(part)] for part in (train, holdout, repeats, later)) + (left_out,)
 
 
 def parse_args():
@@ -81,7 +107,7 @@ def parse_args():
     p.add_argument("--catalog", required=True)
     p.add_argument("--events", required=True)
     p.add_argument("--out", required=True, help="folder for the clean files")
-    p.add_argument("--train-end", required=True, type=date.fromisoformat, help="last training date")
+    p.add_argument("--member-col", default="member_id")
     p.add_argument("--id-col", default="title_id")
     p.add_argument("--runtime-col", default="runtime_minutes")
     p.add_argument("--seconds-per-unit", type=float, default=60, help="60 when the runtime is in minutes")
@@ -104,14 +130,17 @@ def main():
         outcomes[outcome] += 1
         if new:
             clean.append(new)
-    train, holdout = split_by_date(clean, a.date_col, a.train_end)
+    train, holdout, repeats, later, left_out = split_by_member(clean, set(runtimes), a.member_col, a.id_col, a.date_col)
 
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     for name, rows in (("train", train), ("holdout", holdout)):
         write_csv(out / f"{name}.csv", rows, list(events[0]) + AUDIT_COLUMNS)
 
-    print(f"read {len(events)} | clean {len(clean)} | train {len(train)} | holdout {len(holdout)}")
+    print(f"read {len(events)} | clean {len(clean)} | members {len({r[a.member_col] for r in clean})}")
+    print(f"train {len(train)} | holdout {len(holdout)} | removed after the holdout {len(repeats) + len(later)} "
+          f"(repeats of the holdout title {len(repeats)}, other titles {len(later)})")
+    print(f"members left out of holdout: {sum(left_out.values())} {dict(left_out)}")
     for outcome, n in sorted(outcomes.items()):
         print(f"  {outcome}: {n}")
 

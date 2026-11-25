@@ -1,6 +1,6 @@
 # Viewing data cleaning
 
-A small training project: clean viewing events using a title catalog, then split them by date.
+A small training project: clean viewing events using a title catalog, then split them per member.
 Python 3.9+, no packages to install. The raw files are not in this repository: put them in `data/`.
 
 ## Run
@@ -9,45 +9,52 @@ Python 3.9+, no packages to install. The raw files are not in this repository: p
 python3 clean_data.py \
   --catalog "data/Netflix title catalog, November 2026.csv" \
   --events "data/Netflix viewing events export, 17 Aug to 16 Nov 2026.csv" \
-  --out data/clean --train-end 2026-11-09
+  --out data/clean
 python3 -m unittest
 ```
 
-For another dataset, change the paths and the date. Column names are options too: see `python3 clean_data.py --help`.
+For another dataset, change the paths. Column names are options too: see `python3 clean_data.py --help`.
 
 ## Rules
 
 1. Watch time above the title's catalog runtime: the record is removed.
 2. Blank watch time: the record is removed.
 3. `completed` is `True` only when the watch time equals the catalog runtime.
-4. Training data is every record up to and including 9 Nov 2026; holdout is 10 Nov 2026 onward.
+4. For each member, holdout is the last watch of a catalog title they had not watched before. Train is every
+   watch before it. Same timestamp: the higher title id counts as later.
+5. Every watch after the member's own holdout watch is removed.
+6. Members without one holdout title and one watch before it stay whole in train.
 
 ## Result
 
-| File in `data/clean` | Rows | Dates | Completed |
-|---|---|---|---|
-| `train.csv` | 3,635 | 17 Aug to 9 Nov 2026 | 1 |
-| `holdout.csv` | 291 | 10 to 16 Nov 2026 | 0 |
+| File in `data/clean` | Rows | Members | Dates | Completed |
+|---|---|---|---|---|
+| `train.csv` | 3,140 | 598 | 17 Aug to 15 Nov 2026 | 1 |
+| `holdout.csv` | 585 (one per member) | 585 | 25 Aug to 16 Nov 2026 | 0 |
 
-Of 5,000 events, 1,000 were removed for exceeding the runtime and 74 for a blank watch time.
+Of 5,000 events, 1,000 were removed for exceeding the runtime and 74 for a blank watch time, which leaves 3,926.
+Of those, 201 are after the member's own holdout watch and were removed: 41 repeats of the holdout title and
+160 other titles (3,140 + 585 + 201 = 3,926). 13 members have no holdout row; their 18 watches stay in train.
 Two columns are added: `completed_raw` (the original value) and `completed_check` (`verified`, or
 `no_runtime` when the catalog has no runtime). **Do not use these two columns as model features.**
 
 ## Popular top 10
 
-One list for every member: the 10 catalog titles with the most rows in `train.csv`. The holdout is not
-read. The catalog file must be in `data/`.
+One list for every member: the 10 catalog titles with the most rows in `train.csv`. The holdout
+is read only to stop the script if any of its rows is in train. The catalog file must be in `data/`.
 
 ```sh
 python3 popular_top10.py --train data/clean/train.csv \
   --catalog "data/Netflix title catalog, November 2026.csv" \
-  --out data/baseline/popular_top10.csv --train-end 2026-11-09
+  --holdout data/clean/holdout.csv --out data/baseline/popular_top10.csv
 ```
 
 TT-0412, TT-0347 and TT-0588 have enough views for the list but are not in the catalog, so they are left out.
 
 ## Known limits
 
+- Each member is cut at their own holdout watch, not at one date. Train, and so the top 10, includes watches by
+  other members that are later than a given member's holdout watch.
 - Only 1 of the 3,926 kept events equals the catalog runtime exactly, so `completed` is almost constant
   and the holdout has no completed event. A model cannot learn or be tested on this label.
 - 278 kept events have no known runtime (175 with titles missing from the catalog, 103 with a blank
