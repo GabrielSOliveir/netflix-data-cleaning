@@ -33,6 +33,19 @@ Of 5,000 events, 1,000 were removed for exceeding the runtime and 74 for a blank
 Two columns are added: `completed_raw` (the original value) and `completed_check` (`verified`, or
 `no_runtime` when the catalog has no runtime). **Do not use these two columns as model features.**
 
+## Popular top 10
+
+One list for every member: the 10 catalog titles with the most rows in `train.csv`. The holdout is not
+read. The catalog file must be in `data/`.
+
+```sh
+python3 popular_top10.py --train data/clean/train.csv \
+  --catalog "data/Netflix title catalog, November 2026.csv" \
+  --out data/baseline/popular_top10.csv --train-end 2026-11-09
+```
+
+TT-0412, TT-0347 and TT-0588 have enough views for the list but are not in the catalog, so they are left out.
+
 ## Known limits
 
 - Only 1 of the 3,926 kept events equals the catalog runtime exactly, so `completed` is almost constant
