@@ -24,3 +24,19 @@
    comparison between baseline and model fair.
 10. **No code or check copies the project folder or touches `.env`.** Checks that need a copy copy named files
     only. `test_no_secret_copies.py` enforces this for the Python files in the repository.
+11. **The two-tower model uses numpy** (pinned in `requirements.txt`); cleaning, split and top 10 stay on the
+    standard library. Alternative: PyTorch, too heavy for 300 titles and about 3,000 rows.
+12. **How the model is compared** (written before any training).
+    - Main metric: hit@10, the share of holdout members whose holdout title is in their 10. Second: NDCG@10.
+    - Two baselines: the saved top 10 as it is, and popular titles the member has not watched. The holdout is
+      always an unwatched title and the model skips watched ones, so only the second isolates personalisation.
+    - The model beats a baseline if hit@10 is higher and the paired exact McNemar test gives p < 0.05.
+    - Settings are chosen on a validation set cut from train with the same split per member. The holdout is
+      read once, by the final run, after the settings are fixed. Seeds 0 to 4 are all reported; seed 0 is the model.
+    - Only `title_id` of a holdout row is used, as the answer. Member features come from their train rows.
+    - Added after validation and before the holdout was read: a third reference with no learning, popular
+      unwatched titles in the member's favourite genre. It scored above the first model on validation, so a win
+      over the popular lists alone does not show that the two towers are needed.
+13. **Result of the single holdout run:** the two-tower model beats the popular top 10 (340 hits against 96 of 585)
+    and loses to the genre rule (375). The holdout is now used: a new model is chosen on validation, and a
+    second holdout score must be reported as a second look.

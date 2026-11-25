@@ -1,7 +1,7 @@
 # Viewing data cleaning
 
 A small training project: clean viewing events using a title catalog, then split them per member.
-Python 3.9+, no packages to install. The raw files are not in this repository: put them in `data/`.
+Python 3.9+. Cleaning and the top 10 need no packages; the model needs `pip install -r requirements.txt`. The raw files are not in this repository: put them in `data/`.
 
 ## Run
 
@@ -50,6 +50,33 @@ python3 popular_top10.py --train data/clean/train.csv \
 ```
 
 TT-0412, TT-0347 and TT-0588 have enough views for the list but are not in the catalog, so they are left out.
+
+## Two-tower model
+
+**Finding:** the model beats the popular top 10, but a simple favourite-genre rule beats the model.
+
+Member tower: genres and other catalog features of the titles watched, plus country, profile and device.
+Title tower: catalog features plus a small vector per title. Only unwatched catalog titles are recommended.
+
+```sh
+python3 train_two_tower.py tune --train data/clean/train.csv \
+  --catalog "data/Netflix title catalog, November 2026.csv"
+python3 train_two_tower.py final --train data/clean/train.csv --holdout data/clean/holdout.csv \
+  --catalog "data/Netflix title catalog, November 2026.csv" --popular data/baseline/popular_top10.csv
+```
+
+`tune` uses a validation set cut from train. `final` reads the holdout once and refuses to run again while
+`models/results.json` exists. Holdout result, 585 members:
+
+| List | hit@10 | NDCG@10 | Hits |
+|---|---|---|---|
+| Popular top 10 | 0.164 | 0.097 | 96 |
+| Popular, unwatched | 0.174 | 0.105 | 102 |
+| **Two-tower (seed 0)** | **0.581** | **0.296** | **340** |
+| Popular in favourite genre, unwatched (no learning) | 0.641 | 0.337 | 375 |
+
+Seeds 0 to 4 of the model give 0.568 to 0.600. It beats both popular lists (McNemar p < 0.001) and **loses to the
+genre rule** (p < 0.001): almost all of its gain is the member's favourite genre.
 
 ## Known limits
 
