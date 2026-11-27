@@ -1,0 +1,65 @@
+{
+  "user_id": "M-10073",
+  "recommendations": [
+    {
+      "title_id": "TT-0044",
+      "title_name": "Dinner Party Disasters",
+      "primary_genre": "Comedy",
+      "score": 0.7911798534960826
+    },
+    {
+      "title_id": "TT-0043",
+      "title_name": "Half Marathon Hopes",
+      "primary_genre": "Comedy",
+      "score": 0.531982672677912
+    },
+    {
+      "title_id": "TT-0039",
+      "title_name": "Office Plant Rebellion",
+      "primary_genre": "Comedy",
+      "score": 0.5201630853727726
+    },
+    {
+      "title_id": "TT-0031",
+      "title_name": "Minivan Mayhem",
+      "primary_genre": "Comedy",
+      "score": 0.5149437491190711
+    },
+    {
+      "title_id": "TT-0300",
+      "title_name": "Pancake Summit",
+      "primary_genre": "Comedy",
+      "score": 0.5042301194024992
+    },
+    {
+      "title_id": "TT-0038",
+      "title_name": "Wrong Turn Road Trip",
+      "primary_genre": "Comedy",
+      "score": 0.501494357910343
+    },
+    {
+      "title_id": "TT-0047",
+      "title_name": "Bus Stop Confessions",
+      "primary_genre": "Comedy",
+      "score": 0.5012487557953991
+    },
+    {
+      "title_id": "TT-0034",
+      "title_name": "Splash Zone Summer",
+      "primary_genre": "Comedy",
+      "score": 0.49690701938021764
+    },
+    {
+      "title_id": "TT-0040",
+      "title_name": "Small Town Mayor Mess",
+      "primary_genre": "Comedy",
+      "score": 0.49263342754293304
+    },
+    {
+      "title_id": "TT-0024",
+      "title_name": "Late Shift Bakery",
+      "primary_genre": "Comedy",
+      "score": 0.49166428198510603
+    }
+  ]
+}
