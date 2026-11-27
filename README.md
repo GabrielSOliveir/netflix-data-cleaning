@@ -96,3 +96,24 @@ second look at the holdout: 64 comes from the brief, and its other settings were
   case the removed events may be valid views of several episodes.
 
 The reasons for each rule are in [DECISIONS.md](DECISIONS.md).
+
+## Top Picks API
+
+With Python 3.11, run `pip install -r requirements-api.txt` and
+`uvicorn api:app`. Request `GET /recommendations/M-10073` or open `/docs`.
+At startup the service upserts 300 catalog titles into embedded Qdrant. For a
+persistent Qdrant server, set `QDRANT_URL` to its URL and use one startup worker.
+
+The serving model combines the trained member and title towers with a
+64-dimensional TF-IDF/latent semantic description channel. A member's text
+vector averages the descriptions of catalog titles they played. Retrieval uses
+cosine similarity over the two channels, with a Qdrant exclusion filter for
+every catalog title played in train. Item-specific popularity and ID offsets
+are omitted for all titles so a new release is scored on the same content basis.
+The previous training metrics apply to the original scorer.
+
+The serving export contains the title vectors, catalog response fields, and
+member-tower inference weights. To rebuild it using the original inputs, run
+`python build_index_data.py --catalog "data/Netflix title catalog, November 2026.csv" --checkpoint models/model_64/two_tower.npz`.
+Run `SAVE_RESPONSES=1 python -m unittest -v test_api` to validate the contract
+and regenerate both endpoint samples in `saved_responses/`.

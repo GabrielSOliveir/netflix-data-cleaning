@@ -38,6 +38,15 @@ class Encoder:
         self.log_pop = np.array([log(views[t] + 1.0) for t in self.ids])
         self.n_member = self.titles.shape[1] + len(self.context) + 1
 
+    @classmethod
+    def from_features(cls, ids, titles, context):
+        """Restore the fitted feature layout for serving without the raw catalog."""
+        encoder = cls.__new__(cls)
+        encoder.ids, encoder.titles, encoder.context = ids, titles, context
+        encoder.index = {title: i for i, title in enumerate(ids)}
+        encoder.slot = {pair: i for i, pair in enumerate(context)}
+        return encoder
+
     def member(self, history):
         known = [self.index[r["title_id"]] for r in history if r["title_id"] in self.index]
         taste = self.titles[known].mean(0) if known else np.zeros(self.titles.shape[1])
